@@ -3,12 +3,12 @@ title: Assessing the Impact of the Anacostia Watershed Restoration Plan on the W
   Quality of the Northeast Branch
 author: "Atalie Fischer"
 output:
-  word_document: default
   pdf_document:
     keep_tex: yes
     fig_caption: yes
     number_sections: yes
-subtitle: Web address for GitHub repository
+  word_document: default
+subtitle: https://github.com/atf35/Fischer_WDA2022_FinalProject
 geometry: margin=2.54cm
 fontsize: 12pt
 mainfont: Times New Roman
