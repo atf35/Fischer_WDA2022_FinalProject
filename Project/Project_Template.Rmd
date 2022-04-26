@@ -1,0 +1,571 @@
+---
+title: Assessing the Impact of the Anacostia Watershed Restoration Plan on the Water
+  Quality of the Northeast Branch
+author: "Atalie Fischer"
+output:
+  word_document: default
+  pdf_document:
+    keep_tex: yes
+    fig_caption: yes
+    number_sections: yes
+subtitle: Web address for GitHub repository
+geometry: margin=2.54cm
+fontsize: 12pt
+mainfont: Times New Roman
+---
+
+\newpage
+
+```{r Setup, include=FALSE}
+# Set your working directory
+setwd("/Users/ataliefischer/Desktop/WDA/Fischer_WDA2022_FinalProject")
+
+# Load your packages
+library(tidyverse)
+library(lubridate)
+library(dataRetrieval)
+library(cowplot)
+library(trend)
+library(forecast)
+library(tseries)
+
+# Set your ggplot theme
+theme_set(theme_classic())
+
+## Load your datasets
+
+# Explore data available
+NEBranch_raw <- whatNWISdata(siteNumbers = "01649500") # North East Branch, Anacostia at Riverdale, MD
+
+# Load discharge data
+NEBranch_flow <- readNWISdv(siteNumbers = "01649500", # North East Branch, Anacostia at Riverdale, MD
+                     parameterCd = "00060", # discharge (cfs)
+                     startDate = "2003-01-01",
+                     endDate = "")
+names(NEBranch_flow)[4:5] <- c("Discharge", "Approval.Code")
+
+# Load water quality data
+NEBranchWQ_raw_full <- readWQPqw(siteNumbers = "USGS-01649500", # North East Branch, Anacostia at Riverdale, MD
+                     parameterCd = c("00010", # Temperature, water
+                                     "00095", # Specific cond at 25C
+                                     "00300", # Dissolved oxygen
+                                     "00400", # pH
+                                     "63680"),  # Turbidity, Form Neph
+                     startDate = "2003-01-01",
+                     endDate = "2022-04-23")
+NEBranchWQ_raw_early <- readWQPqw(siteNumbers = "USGS-01649500", # North East Branch, Anacostia at Riverdale, MD
+                     parameterCd = c("00010", # Temperature, water
+                                     "00095", # Specific cond at 25C
+                                     "00300", # Dissolved oxygen
+                                     "00400", # pH
+                                     "63680"),  # Turbidity, Form Neph
+                     startDate = "2003-01-01",
+                     endDate = "2009-12-31")
+NEBranchWQ_raw_late <- readWQPqw(siteNumbers = "USGS-01649500", # North East Branch, Anacostia at Riverdale, MD
+                     parameterCd = c("00010", # Temperature, water
+                                     "00095", # Specific cond at 25C
+                                     "00300", # Dissolved oxygen
+                                     "00400", # pH
+                                     "63680"),  # Turbidity, Form Neph
+                     startDate = "2010-01-01",
+                     endDate = "")
+```
+
+```{r Discharge Data Wrangling, include=FALSE}
+#split discharge data
+NEBranch_flow_early <- filter(NEBranch_flow, Date > "2003-01-01" & Date < "2010-01-01")
+NEBranch_flow_late <- filter(NEBranch_flow, Date > "2010-01-01" & Date < "2022-04-23")
+```
+
+```{r Water Quality Data Wrangling, include=FALSE}
+## Full time period
+NEBranchWQ_processed_full <- NEBranchWQ_raw_full %>%
+  select(ActivityStartDate, CharacteristicName, ResultMeasureValue) %>%
+  mutate(Variable = case_when(CharacteristicName == "Temperature, water" ~ "Temp_C",
+                              CharacteristicName == "Specific conductance" ~ "SpC_uS.cm",
+                              CharacteristicName == "Oxygen" ~ "Oxygen_mg.L",
+                              CharacteristicName == "Turbidity" ~ "Turbidity_FNU")) %>%
+  select(-CharacteristicName) %>%
+  na.omit() %>% 
+  mutate(Year = year(ActivityStartDate),
+         Month = month(ActivityStartDate),
+         Date_monthrounded = floor_date(ActivityStartDate, "month")) %>% # round date
+  arrange(ActivityStartDate) %>% 
+  group_by(Date_monthrounded, Variable) %>% 
+  mutate(ResultMeasureValue = mean(ResultMeasureValue)) %>% 
+  select(-ActivityStartDate) %>% 
+  unique()
+
+# pivot wider
+NEBranchWQ_wider_full <- NEBranchWQ_processed_full %>% 
+  pivot_wider(names_from = "Variable", values_from = "ResultMeasureValue") 
+
+# identify gaps
+Months_full <- data.frame(Date_monthrounded = seq.Date(from = as.Date("2003-07-01"), to = as.Date("2022-04-23"), by = "month"))
+
+NEBranchWQ_monthly_full <- left_join(Months_full, NEBranchWQ_wider_full)
+
+
+
+## Early time period
+NEBranchWQ_processed_early <- NEBranchWQ_raw_early %>%
+  select(ActivityStartDate, CharacteristicName, ResultMeasureValue) %>%
+  mutate(Variable = case_when(CharacteristicName == "Temperature, water" ~ "Temp_C",
+                              CharacteristicName == "Specific conductance" ~ "SpC_uS.cm",
+                              CharacteristicName == "Oxygen" ~ "Oxygen_mg.L",
+                              CharacteristicName == "Turbidity" ~ "Turbidity_FNU")) %>%
+  select(-CharacteristicName) %>%
+  na.omit() %>% 
+  mutate(Year = year(ActivityStartDate),
+         Month = month(ActivityStartDate),
+         Date_monthrounded = floor_date(ActivityStartDate, "month")) %>% # round date
+  arrange(ActivityStartDate) %>% 
+  group_by(Date_monthrounded, Variable) %>% 
+  mutate(ResultMeasureValue = mean(ResultMeasureValue)) %>% 
+  select(-ActivityStartDate) %>% 
+  unique()
+
+# pivot wider
+NEBranchWQ_wider_early <- NEBranchWQ_processed_early %>% 
+  pivot_wider(names_from = "Variable", values_from = "ResultMeasureValue") 
+
+# identify gaps
+Months_early <- data.frame(Date_monthrounded = seq.Date(from = as.Date("2003-07-01"), to = as.Date("2009-12-01"), by = "month"))
+
+NEBranchWQ_monthly_early <- left_join(Months_early, NEBranchWQ_wider_early)
+
+
+
+## Late time period
+NEBranchWQ_processed_late <- NEBranchWQ_raw_late %>%
+  select(ActivityStartDate, CharacteristicName, ResultMeasureValue) %>%
+  mutate(Variable = case_when(CharacteristicName == "Temperature, water" ~ "Temp_C",
+                              CharacteristicName == "Specific conductance" ~ "SpC_uS.cm",
+                              CharacteristicName == "Oxygen" ~ "Oxygen_mg.L",
+                              CharacteristicName == "Turbidity" ~ "Turbidity_FNU")) %>%
+  select(-CharacteristicName) %>%
+  na.omit() %>% 
+  mutate(Year = year(ActivityStartDate),
+         Month = month(ActivityStartDate),
+         Date_monthrounded = floor_date(ActivityStartDate, "month")) %>% # round date
+  arrange(ActivityStartDate) %>% 
+  group_by(Date_monthrounded, Variable) %>% 
+  mutate(ResultMeasureValue = mean(ResultMeasureValue)) %>% 
+  select(-ActivityStartDate) %>% 
+  unique()
+
+# pivot wider
+NEBranchWQ_wider_late <- NEBranchWQ_processed_late %>% 
+  pivot_wider(names_from = "Variable", values_from = "ResultMeasureValue") 
+
+# identify gaps
+Months_late <- data.frame(Date_monthrounded = seq.Date(from = as.Date("2010-10-01"), to = as.Date("2022-04-01"), by = "month"))
+
+NEBranchWQ_monthly_late <- left_join(Months_late, NEBranchWQ_wider_late)
+
+```
+
+```{r Linear Interpolations, include=FALSE}
+## Discharge
+# full
+Discharge_linearinterp <- as.data.frame(approx(NEBranch_flow$Discharge, n = 7044, method = "linear"))
+NEBranch_flow$Discharge <- Discharge_linearinterp$y
+# early
+Discharge_early_linearinterp <- as.data.frame(approx(NEBranch_flow_early$Discharge, n = 2556, method = "linear"))
+NEBranch_flow_early$Discharge <- Discharge_early_linearinterp$y
+#late
+Discharge_late_linearinterp <- as.data.frame(approx(NEBranch_flow_late$Discharge, n = 4483, method = "linear"))
+NEBranch_flow_late$Discharge <- Discharge_late_linearinterp$y
+
+
+
+## Turbidity
+# full
+Turb_linearinterp <- as.data.frame(approx(NEBranchWQ_monthly_full$Turbidity_FNU, n = 226, method = "linear"))
+NEBranchWQ_monthly_full$Turbidity_FNU <- Turb_linearinterp$y
+# early
+Turb_early_linearinterp <- as.data.frame(approx(NEBranchWQ_monthly_early$Turbidity_FNU, n = 78, method = "linear"))
+NEBranchWQ_monthly_early$Turbidity_FNU <- Turb_early_linearinterp$y
+#late
+Turb_late_linearinterp <- as.data.frame(approx(NEBranchWQ_monthly_late$Turbidity_FNU, n = 139, method = "linear"))
+NEBranchWQ_monthly_late$Turbidity_FNU <- Turb_late_linearinterp$y
+
+
+
+## Temperature
+# full
+Temp_linearinterp <- as.data.frame(approx(NEBranchWQ_monthly_full$Temp_C, n = 226, method = "linear"))
+NEBranchWQ_monthly_full$Temp_C <- Temp_linearinterp$y
+# early
+Temp_early_linearinterp <- as.data.frame(approx(NEBranchWQ_monthly_early$Temp_C, n = 78, method = "linear"))
+NEBranchWQ_monthly_early$Temp_C <- Temp_early_linearinterp$y
+#late
+Temp_late_linearinterp <- as.data.frame(approx(NEBranchWQ_monthly_late$Temp_C, n = 139, method = "linear"))
+NEBranchWQ_monthly_late$Temp_C <- Temp_late_linearinterp$y
+
+
+
+## Specific Conductivity
+# full
+Cond_linearinterp <- as.data.frame(approx(NEBranchWQ_monthly_full$SpC_uS.cm, n = 226, method = "linear"))
+NEBranchWQ_monthly_full$SpC_uS.cm <- Cond_linearinterp$y
+# early
+Cond_early_linearinterp <- as.data.frame(approx(NEBranchWQ_monthly_early$SpC_uS.cm, n = 78, method = "linear"))
+NEBranchWQ_monthly_early$SpC_uS.cm <- Cond_early_linearinterp$y
+# late
+Cond_late_linearinterp <- as.data.frame(approx(NEBranchWQ_monthly_late$SpC_uS.cm, n = 139, method = "linear"))
+NEBranchWQ_monthly_late$SpC_uS.cm <- Cond_late_linearinterp$y
+
+
+
+## Dissolved oxygen
+# full
+Ox_linearinterp <- as.data.frame(approx(NEBranchWQ_monthly_full$Oxygen_mg.L, n = 226, method = "linear"))
+NEBranchWQ_monthly_full$Oxygen_mg.L <- Ox_linearinterp$y
+# early
+Ox_early_linearinterp <- as.data.frame(approx(NEBranchWQ_monthly_early$Oxygen_mg.L, n = 78, method = "linear"))
+NEBranchWQ_monthly_early$Oxygen_mg.L <- Ox_early_linearinterp$y
+# late
+Ox_late_linearinterp <- as.data.frame(approx(NEBranchWQ_monthly_late$Oxygen_mg.L, n = 139, method = "linear"))
+NEBranchWQ_monthly_late$Oxygen_mg.L <- Ox_late_linearinterp$y
+
+```
+
+# Rationale and Research Questions
+
+The Anacostia River watershed is a heavily urbanized watersheds located in the Baltimore-DC area. It contains 14 major subwatersheds and a tidal portion covering approximately 176 square miles (USACE, 2022). The Northeast Branch and the Northwest Branch are the two main tributaries of the Anacostia River, which flows into the Potomac River and into the Chesapeake Bay. This watershed is one of the main priorities for restoration in the Chesapeake Bay Program. The Army Corps of Engineers (Corps) developed the Anacostia Restoration Plan in 2010 to improve and restore the Anacostia Watershed. It identified more than 3,000 projects (USACE, 2022). Some of the strategies of these projects include stormwater controls, stream restoration, wetland creation and restoration, fish blockage removal, reforestation, trash and toxic contaminant control, and parkland acquisition (Metropolitan Washington Council of Governments, 2010). These projects aim to improve water quality and reduce flooding.
+
+The goal of this report is to assess the progress of the Anacostia Restoration Plan on water quality of the Northeast Branch. Due to limitations on data availability, this report will focus only on the Plan's effectiveness in using green stormwater controls in removing suspended sediment, removing contaminants, and reducing the temperature from urban stormwater runoff (See the "Dataset Information" section for details on these specific parameters).
+
+The main research question is: *Has there been an improvement in water quality of the Northeast Branch since the implementation of the Anacostia Restoration Plan in 2010?* This study will be guided by the following question comparing time periods before and after 2010:
+
+>  How has water quality changed in terms of turbidity, temperature, specific conductance, and dissolved oxygen?
+
+\newpage
+
+# Dataset Information
+
+Data were retrieved from the the United States Geological Survey (USGS) National Water Information System (NWIS). The dataRetrieval package in R was used to pull data directly from NWIS without the need to download any data files. Data were pulled from the gage on the Northeast Branch of the Anacostia River near Riverdale, Maryland (USGS gage #01649500). The water quality dataset was wrangled into two separate time periods: before the Anacostia Watershed Restoration Plan implementation in 2010 and after. The water quality data were sampled monthly and their sampling dates were rounded to the first of the month for even time steps. Linear interpolations were conducted to fill in any missing values. 
+
+**Table 1:** Summary of raw data used.
+
+Dataset               | Information
+----------------------|------------------------
+NEBranch_flow         | Discharge data collected at USGS gage #01649500 from 1/1/2003 through 4/22/2022
+NEBranchWQ_raw_full   | Water quality data collected at USGS gage #01649500 from 1/1/2003 through 4/22/2022. Parameters collected were turbidity, temperature, specific conductance, and dissolved oxygen. 
+
+\newpage
+
+# Exploratory Analysis 
+
+```{r Water Quality Summary, include=FALSE}
+summary(NEBranchWQ_wider_full)
+```
+
+Turbidity was plotted over time to visualize any trends in suspended sediment (Figure 1). There are no obvious trends in the data from this visualization. However, there are six missing values. A summary of the data show that the average turbidity in the Northeast Branch is 107.920 FNU.
+
+```{r Turbidity over time, include=TRUE, echo=FALSE, warning=FALSE, fig.align='left', fig.cap="Turbidity of the North East Branch over time."}
+# Turbidity
+plot2<- ggplot(NEBranchWQ_wider_full, aes(x = Date_monthrounded, y = Turbidity_FNU)) +
+  geom_point() +
+  geom_line() +
+  scale_y_log10() +
+  labs(x = "Date", y = "Turbidity (FNU)")
+plot2
+```
+
+\newpage
+
+Temperature was plotted to visualize any trends over time (Figure 2). There are no obvious trends in temperature over time and a summary of the data show that there are no missing values in the dataset. However, around 2006 and 2007, a high temperature is not observed like the rest of the time period. The mean temperature over the full time period is 14.45 degrees C. 
+
+```{r Temperature over time, include=TRUE, echo=FALSE, warning=FALSE, fig.align='left', fig.cap="Temperature of the North East Branch over time."}
+plot3 <- ggplot(NEBranchWQ_wider_full, aes(x = Date_monthrounded, y = Temp_C)) +
+  geom_point() +
+  geom_line() +
+  labs(x = "Date", y = "Temperature (C)")
+plot3
+```
+
+\newpage
+
+Specific conductance was plotted over time to visualize any major trends in ionic concentration over time (Figure 3). The plot shows eight major peaks in specific conductance from 2003 through 2022, with the highest peak in 2021. A summary of the data show that the mean specific conductance is 390.8 uS/cm and the maximum is 4640.0 uS/cm, which is an order of magnitude larger. There are no missing values for specific conductance in this dataset.  
+
+```{r Specific conductivity over time, include=TRUE, echo=FALSE, warning=FALSE, fig.align='left', fig.cap="Specific conductivity of the North East Branch over time."}
+plot4 <- ggplot(NEBranchWQ_wider_full, aes(x = Date_monthrounded, y = SpC_uS.cm)) +
+  geom_point() +
+  geom_line() +
+  labs(x = "Date", y = expression("Specific Conductivity ("*mu*"S/cm)"))
+plot4
+```
+
+\newpage
+
+Dissolved oxygen was plotted to visualize any major trends over time (Figure 4). It appears that dissolved oxygen concentrations may be less variable in recent years, but it is difficult to tell in the plot. A summary of the data show that the average dissolved oxygen concentration is 10.400 mg/L and that there is one missing value for dissolved oxygen in this dataset. 
+
+```{r Dissolved oxygen over time, include=TRUE, echo=FALSE, warning=FALSE, fig.align='left', fig.cap="Dissolved oxygen concentration of the North East Branch over time."}
+plot5 <- ggplot(NEBranchWQ_wider_full, aes(x = Date_monthrounded, y = Oxygen_mg.L)) +
+  geom_point() +
+  geom_line() +
+  labs(x = "Date", y = "Dissolved Oxygen (mg/L")
+plot5
+```
+
+\newpage
+
+# Analysis
+
+## Question: How has water quality changed? 
+
+### Turbidity
+
+Time series analyses were conducted on turbidity for the time period before the implementation of the Anacostia Watershed Restoration Plan (2003 to 2009) (Figure 5) and after its implementation (2010-2022) (Figure 6). A seasonal Mann-Kendall's test was conducted on both time periods to test for stationarity. Both time periods display stationarity and are neither significantly increasing or decreasing over time with p-values greater that 0.05 (Table 2). While these data are not statistically significant, it is worthwhile to consider the sign of the tau values. Turbidity prior to the Plan's implementation was generally increasing, while it is generally decreasing post-implementation. This suggests that over a longer time period, stormwater control projects could potentially reduce turbidity significantly. 
+
+```{r Turbidity Time Series Analysis, message=FALSE, warning=FALSE, include=FALSE}
+# Early
+Turb_early_ts <- ts(NEBranchWQ_monthly_early[[7]], frequency = 12)
+Turb_early_decomp <- stl(Turb_early_ts, s.window = "periodic")
+
+# Late
+Turb_late_ts <- ts(NEBranchWQ_monthly_late[[7]], frequency = 12)
+Turb_late_decomp <- stl(Turb_late_ts, s.window = "periodic")
+```
+
+```{r Plot of Early Turbidity Time Series Decomposition, echo=FALSE, fig.align='center', fig.cap="Time series decomposition of turbidity from 2003 to 2009.", fig.height=4, fig.width=6, message=FALSE, warning=FALSE}
+plot8 <- plot(Turb_early_decomp,
+     main = "Turbidity 2003-2009")
+plot8
+```
+
+```{r Early Turbidity Stationarity Test, message=FALSE, warning=FALSE, include=FALSE}
+Turb_early_trend <- Kendall::SeasonalMannKendall(Turb_early_ts)
+summary(Turb_early_trend) #tau = 0.13, 2-sided pvalue =0.17993
+```
+```{r Plot of Late Turbidity Time Series Decomposition, echo=FALSE, fig.align='center', fig.cap="Time series decomposition of turbidity from 2010 to 2022.", fig.height=4, fig.width=6, message=FALSE, warning=FALSE}
+plot9 <- plot(Turb_late_decomp,
+     main = "Turbidity 2010-2022")
+plot9
+```
+
+```{r Late Turbidity Stationarity Test, message=FALSE, warning=FALSE, include=FALSE}
+Turb_late_trend <- Kendall::SeasonalMannKendall(Turb_late_ts)
+summary(Turb_late_trend) #tau = -0.0992, 2-sided pvalue =0.12894
+```
+
+\newpage
+
+```{r Plot of Turbidity over time with LMs, echo=FALSE, fig.align='center', fig.height=4, fig.width=6, fig.cap="Plot of turbidity over time with linear models from 2003 to 2009 and 2010 to 2022.", message=FALSE, warning=FALSE, include=TRUE}
+ggplot() +
+  geom_line(data = NEBranchWQ_monthly_early, 
+            aes(x = Date_monthrounded, y = Turbidity_FNU),
+            lty = 3) +
+  geom_smooth(data = NEBranchWQ_monthly_early, 
+              aes(x = Date_monthrounded, y = Turbidity_FNU), 
+              method = lm,
+              color = "red") +
+  geom_line(data = NEBranchWQ_monthly_late, 
+            aes(x = Date_monthrounded, y = Turbidity_FNU),
+            lty = 1) +
+  geom_smooth(data = NEBranchWQ_monthly_late, 
+              aes(x = Date_monthrounded, y = Turbidity_FNU), 
+              method = lm,
+              color = "blue") +
+  labs(x = "Date", y = "Turbidity (FNU)")
+```
+
+\newpage
+
+### Temperature
+
+Time series analyses were conducted on temperature for the time period before the implementation of the Anacostia Watershed Restoration Plan (2003 to 2009) (Figure 7) and after its implementation (2010-2022) (Figure 8). A seasonal Mann-Kendall's test was conducted on both time periods to test for stationarity. Both time periods display stationarity and are neither significantly increasing or decreasing over time with p-values greater that 0.05 (Table 2). The Anacostia Watershed Restoration Plan did not significanlty affect temperature in the Northeast Branch. 
+
+```{r Temperature Time Series Analysis, message=FALSE, warning=FALSE, include=FALSE}
+# Early
+Temp_early_ts <- ts(NEBranchWQ_monthly_early[[4]], frequency = 12)
+Temp_early_decomp <- stl(Temp_early_ts, s.window = "periodic")
+
+# Late
+Temp_late_ts <- ts(NEBranchWQ_monthly_late[[4]], frequency = 12)
+Temp_late_decomp <- stl(Temp_late_ts, s.window = "periodic")
+```
+
+```{r Plot of Early Temperature Time Series Decomposition, echo=FALSE, fig.align='center', fig.height=4, fig.width=6, fig.cap="Time series decomposition of temperature from 2003 to 2009.", message=FALSE, warning=FALSE, include=TRUE}
+plot(Temp_early_decomp,
+     main = "Temperature 2003-2009")
+```
+
+```{r Early Temperature Stationarity Test, message=FALSE, warning=FALSE, include=FALSE}
+Temp_early_trend <- Kendall::SeasonalMannKendall(Temp_early_ts)
+summary(Temp_early_trend) #tau = 0.144, 2-sided pvalue =0.13719
+```
+```{r Plot of Late Temperature Time Series Decomposition, echo=FALSE, fig.align='center', fig.height=4, fig.width=6, fig.cap="Time series decomposition of temperature from 2010 to 2022.", message=FALSE, warning=FALSE, include=TRUE}
+plot(Temp_late_decomp,
+     main = "Temperature 2010-2022")
+```
+
+```{r Late Temperature Stationarity Test, message=FALSE, warning=FALSE, include=FALSE}
+Temp_late_trend <- Kendall::SeasonalMannKendall(Temp_late_ts)
+summary(Temp_late_trend) #tau = 0.0245, 2-sided pvalue =0.70806
+```
+
+\newpage
+
+```{r Plot of Temperature over time with LMs, echo=FALSE, fig.align='center', fig.height=4, fig.width=6, fig.cap="Plot of temperature over time with linear models from 2003 to 2009 and 2010 to 2022.", message=FALSE, warning=FALSE, include=TRUE}
+ggplot() +
+  geom_line(data = NEBranchWQ_monthly_early, 
+            aes(x = Date_monthrounded, y = Temp_C),
+            lty = 3) +
+  geom_smooth(data = NEBranchWQ_monthly_early, 
+              aes(x = Date_monthrounded, y = Temp_C), 
+              method = lm,
+              color = "red") +
+  geom_line(data = NEBranchWQ_monthly_late, 
+            aes(x = Date_monthrounded, y = Temp_C),
+            lty = 1) +
+  geom_smooth(data = NEBranchWQ_monthly_late, 
+              aes(x = Date_monthrounded, y = Temp_C), 
+              method = lm,
+              color = "blue") +
+  labs(x = "Date", y = "Temperature (C)")
+```
+
+\newpage
+
+### Specific Conductivity
+
+Time series analyses were conducted on specific conductivity for the time period before the implementation of the Anacostia Watershed Restoration Plan (2003 to 2009) (Figure 9) and after its implementation (2010-2022) (Figure 10). A seasonal Mann-Kendall's test was conducted on both time periods to test for stationarity. Both time periods display stationarity and are neither significantly increasing or decreasing over time with p-values greater that 0.05 (Table 2). While these data are not statistically significant, it is worthwhile to consider the sign of the tau values. Specific conductivity prior to the Plan's implementation was generally increasing, while it is generally decreasing post-implementation. This suggests that over a longer time period, stormwater control projects could potentially reduce specific conductivity and the concentration of pollutants significantly. 
+
+```{r Specific Conductivity Time Series Analysis, message=FALSE, warning=FALSE, include=FALSE}
+# Early
+Cond_early_ts <- ts(NEBranchWQ_monthly_early[[5]], frequency = 12)
+Cond_early_decomp <- stl(Cond_early_ts, s.window = "periodic")
+
+# Late
+Cond_late_ts <- ts(NEBranchWQ_monthly_late[[5]], frequency = 12)
+Cond_late_decomp <- stl(Cond_late_ts, s.window = "periodic")
+```
+
+```{r Plot of Early Specific Conductivity Time Series Decomposition, echo=FALSE, fig.align='center', fig.height=4, fig.width=6, fig.cap="Time series decomposition of specific conductivity from 2003 to 2009.", message=FALSE, warning=FALSE, include=TRUE}
+plot(Cond_early_decomp,
+     main = "Specific Conductivity 2003-2009")
+```
+
+```{r Early Specific Conductivity Stationarity Test, message=FALSE, warning=FALSE, include=FALSE}
+Cond_early_trend <- Kendall::SeasonalMannKendall(Cond_early_ts)
+summary(Cond_early_trend) #tau = 0.0926, 2-sided pvalue =0.33815
+```
+
+```{r Plot of Late Specific Conductivity Time Series Decomposition, echo=FALSE, fig.align='center', fig.height=4, fig.width=6, fig.cap="Time series decomposition of specific conductivity from 2010 to 2022.", message=FALSE, warning=FALSE, include=TRUE}
+plot(Cond_late_decomp,
+     main = "Specific Conductivity 2010-2022")
+```
+
+```{r Late Specific Conductivity Stationarity Test, message=FALSE, warning=FALSE, include=FALSE}
+Cond_late_trend <- Kendall::SeasonalMannKendall(Cond_late_ts)
+summary(Cond_late_trend) #tau = -0.0258, 2-sided pvalue =0.69284
+```
+
+\newpage
+
+```{r Plot of Specific Conductance over time with LMs, echo=FALSE, fig.align='center', fig.height=4, fig.width=6, fig.cap="Plot of specific conductivity over time with linear models from 2003 to 2009 and 2010 to 2022.", message=FALSE, warning=FALSE, include=TRUE}
+ggplot() +
+  geom_line(data = NEBranchWQ_monthly_early, 
+            aes(x = Date_monthrounded, y = SpC_uS.cm),
+            lty = 3) +
+  geom_smooth(data = NEBranchWQ_monthly_early, 
+              aes(x = Date_monthrounded, y = SpC_uS.cm), 
+              method = lm,
+              color = "red") +
+  geom_line(data = NEBranchWQ_monthly_late, 
+            aes(x = Date_monthrounded, y = SpC_uS.cm),
+            lty = 1) +
+  geom_smooth(data = NEBranchWQ_monthly_late, 
+              aes(x = Date_monthrounded, y = SpC_uS.cm), 
+              method = lm,
+              color = "blue") +
+  labs(x = "Date", y = expression("Specific Conductivity ("*mu*"S/cm)"))
+```
+
+\newpage
+
+### Dissolved Oxygen
+
+Time series analyses were conducted on dissolved oxygen for the time period before the implementation of the Anacostia Watershed Restoration Plan (2003 to 2009) (Figure 11) and after its implementation (2010-2022) (Figure 12). A seasonal Mann-Kendall's test was conducted on both time periods to test for stationarity. Both time periods display stationarity and are neither significantly increasing or decreasing over time with p-values greater that 0.05 (Table 2). The Anacostia Watershed Restoration Plan did not significanlty affect dissolved oxygen in the Northeast Branch. 
+
+```{r Dissolved Oxygen Time Series Analysis, message=FALSE, warning=FALSE, include=FALSE}
+# Early
+Ox_early_ts <- ts(NEBranchWQ_monthly_early[[6]], frequency = 12)
+Ox_early_decomp <- stl(Ox_early_ts, s.window = "periodic")
+
+# Late
+Ox_late_ts <- ts(NEBranchWQ_monthly_late[[6]], frequency = 12)
+Ox_late_decomp <- stl(Ox_late_ts, s.window = "periodic")
+```
+
+```{r Plot of Early Dissolved Oxygen Time Series Decomposition, echo=FALSE, fig.align='center', fig.height=4, fig.width=6, fig.cap="Time series decomposition of dissolved oxygen from 2003 to 2009.", message=FALSE, warning=FALSE, include=TRUE}
+plot(Ox_early_decomp,
+     main = "Dissolved Oxygen 2003-2009")
+```
+
+```{r Early Dissolved Oxygen Stationarity Test, message=FALSE, warning=FALSE, include=FALSE}
+Ox_early_trend <- Kendall::SeasonalMannKendall(Ox_early_ts)
+summary(Ox_early_trend) #tau = -0.181, 2-sided pvalue =0.061497
+```
+```{r Plot of Late Dissolved Oxygen Time Series Decomposition, echo=FALSE, fig.align='center', fig.height=4, fig.width=6, fig.cap="Time series decomposition of dissolved oxygen from 2010 to 2022.", message=FALSE, warning=FALSE, include=TRUE}
+plot(Ox_late_decomp,
+     main = "Dissolved Oxygen 2010-2022")
+```
+```{r Late Dissolved Oxygen Stationarity Test, message=FALSE, warning=FALSE, include=FALSE}
+Ox_late_trend <- Kendall::SeasonalMannKendall(Ox_late_ts)
+summary(Ox_late_trend) #tau = -0.0626, 2-sided pvalue =0.33838
+```
+
+\newpage
+
+```{r Plot of Dissolved Oxygen over time with LMs, echo=FALSE, fig.align='center', fig.height=4, fig.width=6, fig.cap="Plot of dissolved oxygen over time with linear models from 2003 to 2009 and 2010 to 2022.", message=FALSE, warning=FALSE, include=TRUE}
+ggplot() +
+  geom_line(data = NEBranchWQ_monthly_early, 
+            aes(x = Date_monthrounded, y = Oxygen_mg.L),
+            lty = 3) +
+  geom_smooth(data = NEBranchWQ_monthly_early, 
+              aes(x = Date_monthrounded, y = Oxygen_mg.L), 
+              method = lm,
+              color = "red") +
+  geom_line(data = NEBranchWQ_monthly_late, 
+            aes(x = Date_monthrounded, y = Oxygen_mg.L),
+            lty = 1) +
+  geom_smooth(data = NEBranchWQ_monthly_late, 
+              aes(x = Date_monthrounded, y = Oxygen_mg.L), 
+              method = lm,
+              color = "blue") +
+  labs(x = "Date", y = "Dissolved Oxygen (mg/L)")
+```
+
+\newpage
+
+**Table 2:** Summary of results from stationarity tests.
+
+Parameter             | Time Period   | tau       | p-value
+----------------------|---------------|-----------|-----------------
+Turbidity             | Before        | 0.13      | 0.17993
+     .                | After         | -0.0992   | 0.12894
+Temperature           | Before        | 0.144     | 0.13719
+     .                | After         | 0.0245    | 0.70806
+Specific Conductivity | Before        | 0.0926    | 0.33815
+     .                | After         | -0.0258   | 0.69284
+Dissolved Oxygen      | Before        | -0.181    | 0.061497
+     .                | After         | -0.0626   | 0.33838
+
+\newpage
+
+# Summary and Conclusions
+
+Time series analyses and linear models conducted on turbidity, temperature, specific conductivity, and dissolved oxygen on the time periods both before and after the implementation of the Anacostia Watershed Restoration Plan in 2010 were not significant. Therefore, no concrete conclusions can be drawn from this analysis. However, we can speculate that turbidity and specific conductivity may decrease in the future given longer datasets. 
+
+\newpage
+
+# References
+
+Metropolitan Washington Council of Governments. (2010, April 19). Officials Release Landmark Anacostia Watershed Plan. Retrieved from Newsroom: https://www.mwcog.org/about-us/newsroom/2010/04/19/officials-release-landmark-anacostia-watershed-plan-anacostia-restoration-water-quality/
+
+US Army Corps of Engineers (USACE). (2022, April 26). Anacostia Watershed Restoration. Retrieved from Baltimore District Website: https://www.nab.usace.army.mil/Missions/Environmental/Anacostia-Watershed-Restoration/
+
