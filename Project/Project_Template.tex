@@ -83,7 +83,7 @@ on the Water Quality of the Northeast Branch}
   \apptocmd{\@title}{\par {\large #1 \par}}{}{}
 }
 \makeatother
-\subtitle{Web address for GitHub repository}
+\subtitle{\url{https://github.com/atf35/Fischer_WDA2022_FinalProject}}
 \author{Atalie Fischer}
 \date{}
 
@@ -113,9 +113,9 @@ Council of Governments, 2010). These projects aim to improve water
 quality and reduce flooding.
 
 The goal of this report is to assess the progress of the Anacostia
-Restoration Plan on water quality and flooding of the Northeast Branch.
-Due to limitations on data availability, this report will focus only on
-the Plan's effectiveness in using green stormwater controls in removing
+Restoration Plan on water quality of the Northeast Branch. Due to
+limitations on data availability, this report will focus only on the
+Plan's effectiveness in using green stormwater controls in removing
 suspended sediment, removing contaminants, and reducing the temperature
 from urban stormwater runoff (See the ``Dataset Information'' section
 for details on these specific parameters).
@@ -123,18 +123,11 @@ for details on these specific parameters).
 The main research question is: \emph{Has there been an improvement in
 water quality of the Northeast Branch since the implementation of the
 Anacostia Restoration Plan in 2010?} This study will be guided by the
-following questions comparing time periods before and after 2010:
+following question comparing time periods before and after 2010:
 
 \begin{quote}
-\begin{enumerate}
-\def\labelenumi{\arabic{enumi}.}
-\tightlist
-\item
-  How has the variation in discharge changed?
-\item
-  How has water quality changed in terms of turbidity, temperature,
-  specific conductance, and dissolved oxygen?
-\end{enumerate}
+How has water quality changed in terms of turbidity, temperature,
+specific conductance, and dissolved oxygen?
 \end{quote}
 
 \newpage
@@ -147,12 +140,12 @@ National Water Information System (NWIS). The dataRetrieval package in R
 was used to pull data directly from NWIS without the need to download
 any data files. Data were pulled from the gage on the Northeast Branch
 of the Anacostia River near Riverdale, Maryland (USGS gage \#01649500).
-Both the discharge and the water quality datasets were wrangled into two
-separate time periods: before the Anacostia Watershed Restoration Plan
-implementation in 2010 and after. The water quality data were sampled
-monthly and their sampling dates were rounded to the first of the month
-for even time steps. Linear interpolations were conducted on both
-datasets to fill in any missing values.
+The water quality dataset was wrangled into two separate time periods:
+before the Anacostia Watershed Restoration Plan implementation in 2010
+and after. The water quality data were sampled monthly and their
+sampling dates were rounded to the first of the month for even time
+steps. Linear interpolations were conducted to fill in any missing
+values.
 
 \textbf{Table 1:} Summary of raw data used.
 
@@ -163,8 +156,6 @@ datasets to fill in any missing values.
 Dataset & Information \\
 \midrule
 \endhead
-NEBranch\_raw & Used to explore parameters measured at USGS gage
-\#01649500 \\
 NEBranch\_flow & Discharge data collected at USGS gage \#01649500 from
 1/1/2003 through 4/22/2022 \\
 NEBranchWQ\_raw\_full & Water quality data collected at USGS gage
@@ -178,24 +169,8 @@ turbidity, temperature, specific conductance, and dissolved oxygen. \\
 \hypertarget{exploratory-analysis}{%
 \section{Exploratory Analysis}\label{exploratory-analysis}}
 
-Discharge was plotted to visualize any major trends over time (Figure
-1). There is some seasonality to discharge in the Northeast Branch. It
-appears that low-flow discharges were decreasing from 2003 to about
-2007, but increased again thereafter. It is difficult to see any missing
-data from the plot, however, a summary of the data show that there are
-four missing discharge values.
-
-\begin{figure}
-
-\includegraphics{Project_Template_files/figure-latex/Discharge over time-1} \hfill{}
-
-\caption{Discharge of the North East Branch over time.}\label{fig:Discharge over time}
-\end{figure}
-
-\newpage
-
 Turbidity was plotted over time to visualize any trends in suspended
-sediment (Figure 2). There are no obvious trends in the data from this
+sediment (Figure 1). There are no obvious trends in the data from this
 visualization. However, there are six missing values. A summary of the
 data show that the average turbidity in the Northeast Branch is 107.920
 FNU.
@@ -209,7 +184,7 @@ FNU.
 
 \newpage
 
-Temperature was plotted to visualize any trends over time (Figure 3).
+Temperature was plotted to visualize any trends over time (Figure 2).
 There are no obvious trends in temperature over time and a summary of
 the data show that there are no missing values in the dataset. However,
 around 2006 and 2007, a high temperature is not observed like the rest
@@ -226,7 +201,7 @@ of the time period. The mean temperature over the full time period is
 \newpage
 
 Specific conductance was plotted over time to visualize any major trends
-in ionic concentration over time (Figure 4). The plot shows eight major
+in ionic concentration over time (Figure 3). The plot shows eight major
 peaks in specific conductance from 2003 through 2022, with the highest
 peak in 2021. A summary of the data show that the mean specific
 conductance is 390.8 uS/cm and the maximum is 4640.0 uS/cm, which is an
@@ -243,10 +218,10 @@ conductance in this dataset.
 \newpage
 
 Dissolved oxygen was plotted to visualize any major trends over time
-(Figure 5). It appears that dissolved oxygen concentrations may be less
+(Figure 4). It appears that dissolved oxygen concentrations may be less
 variable in recent years, but it is difficult to tell in the plot. A
 summary of the data show that the average dissolved oxygen concentration
-is 10.400 mg?L and that there is one missing value for dissolved oxygen
+is 10.400 mg/L and that there is one missing value for dissolved oxygen
 in this dataset.
 
 \begin{figure}
@@ -261,53 +236,25 @@ in this dataset.
 \hypertarget{analysis}{%
 \section{Analysis}\label{analysis}}
 
-\hypertarget{question-1-how-has-discharge-been-changed-by-the-implementation-of-the-anacostia-watershed-restoration-plan-in-2010}{%
-\subsection{Question 1: How has discharge been changed by the
-implementation of the Anacostia Watershed Restoration Plan in
-2010?}\label{question-1-how-has-discharge-been-changed-by-the-implementation-of-the-anacostia-watershed-restoration-plan-in-2010}}
-
-\begin{verbatim}
-##               Df    Sum Sq Mean Sq F value   Pr(>F)    
-## Date           1   1102351 1102351    15.7 7.64e-05 ***
-## Residuals   2554 179377920   70234                     
-## ---
-## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-\end{verbatim}
-
-\begin{verbatim}
-##               Df    Sum Sq Mean Sq F value  Pr(>F)   
-## Date           1    392125  392125   9.734 0.00182 **
-## Residuals   4481 180508595   40283                   
-## ---
-## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-\end{verbatim}
-
-\begin{figure}
-
-\includegraphics{Project_Template_files/figure-latex/Plot of Discharge Time Series Decomposition-1} \hfill{}
-
-\caption{Time series decomposition of discharge in the Northeast Branch.}\label{fig:Plot of Discharge Time Series Decomposition}
-\end{figure}
-
-\hypertarget{question-2-how-has-water-quality-changed}{%
-\subsection{Question 2: How has water quality
-changed?}\label{question-2-how-has-water-quality-changed}}
+\hypertarget{question-how-has-water-quality-changed}{%
+\subsection{Question: How has water quality
+changed?}\label{question-how-has-water-quality-changed}}
 
 \hypertarget{turbidity}{%
 \subsubsection{Turbidity}\label{turbidity}}
 
-Time series analyses were conducted for the time period before the
-implementation of the Anacostia Watershed Restoration Plan (2003 to
-2009) and after its implementation (2010-2022). A seasonal
-Mann-Kendall's test was conducted on both time periods to test for
-stationarity. Both time periods display stationarity and are neither
-significantly increasing or decreasing over time with p-values greater
-that 0.05 (Table 2). While these data are not statistically significant,
-it is worthwhile to consider the sign of the tau values. Turbidity prior
-to the Plan's implementation was generally increasing, while it is
-generally decreasing post-implementation. This suggests that over a
-longer time period, stormwater control projects could potentially reduce
-turbidity significantly.
+Time series analyses were conducted on turbidity for the time period
+before the implementation of the Anacostia Watershed Restoration Plan
+(2003 to 2009) (Figure 5) and after its implementation (2010-2022)
+(Figure 6). A seasonal Mann-Kendall's test was conducted on both time
+periods to test for stationarity. Both time periods display stationarity
+and are neither significantly increasing or decreasing over time with
+p-values greater that 0.05 (Table 2). While these data are not
+statistically significant, it is worthwhile to consider the sign of the
+tau values. Turbidity prior to the Plan's implementation was generally
+increasing, while it is generally decreasing post-implementation. This
+suggests that over a longer time period, stormwater control projects
+could potentially reduce turbidity significantly.
 
 \begin{figure}
 
@@ -351,16 +298,15 @@ turbidity significantly.
 \hypertarget{temperature}{%
 \subsubsection{Temperature}\label{temperature}}
 
-Time series analyses were conducted for the time period before the
-implementation of the Anacostia Watershed Restoration Plan (2003 to
-2009) and after its implementation (2010-2022). A seasonal
-Mann-Kendall's test was conducted on both time periods to test for
-stationarity. Both time periods display stationarity and are neither
-significantly increasing or decreasing over time with p-values greater
-that 0.05 (Table 2). The Anacostia Watershed Restoration Plan did not
-significanlty affect temperature in the Northeast Branch.
-
-\newpage
+Time series analyses were conducted on temperature for the time period
+before the implementation of the Anacostia Watershed Restoration Plan
+(2003 to 2009) (Figure 7) and after its implementation (2010-2022)
+(Figure 8). A seasonal Mann-Kendall's test was conducted on both time
+periods to test for stationarity. Both time periods display stationarity
+and are neither significantly increasing or decreasing over time with
+p-values greater that 0.05 (Table 2). The Anacostia Watershed
+Restoration Plan did not significanlty affect temperature in the
+Northeast Branch.
 
 \begin{figure}
 
@@ -396,19 +342,19 @@ significanlty affect temperature in the Northeast Branch.
 \hypertarget{specific-conductivity}{%
 \subsubsection{Specific Conductivity}\label{specific-conductivity}}
 
-Time series analyses were conducted for the time period before the
-implementation of the Anacostia Watershed Restoration Plan (2003 to
-2009) and after its implementation (2010-2022). A seasonal
-Mann-Kendall's test was conducted on both time periods to test for
-stationarity. Both time periods display stationarity and are neither
-significantly increasing or decreasing over time with p-values greater
-that 0.05 (Table 2). While these data are not statistically significant,
-it is worthwhile to consider the sign of the tau values. Specific
-conductivity prior to the Plan's implementation was generally
-increasing, while it is generally decreasing post-implementation. This
-suggests that over a longer time period, stormwater control projects
-could potentially reduce specific conductivity and the concentration of
-pollutants significantly.
+Time series analyses were conducted on specific conductivity for the
+time period before the implementation of the Anacostia Watershed
+Restoration Plan (2003 to 2009) (Figure 9) and after its implementation
+(2010-2022) (Figure 10). A seasonal Mann-Kendall's test was conducted on
+both time periods to test for stationarity. Both time periods display
+stationarity and are neither significantly increasing or decreasing over
+time with p-values greater that 0.05 (Table 2). While these data are not
+statistically significant, it is worthwhile to consider the sign of the
+tau values. Specific conductivity prior to the Plan's implementation was
+generally increasing, while it is generally decreasing
+post-implementation. This suggests that over a longer time period,
+stormwater control projects could potentially reduce specific
+conductivity and the concentration of pollutants significantly.
 
 \begin{figure}
 
@@ -444,14 +390,15 @@ pollutants significantly.
 \hypertarget{dissolved-oxygen}{%
 \subsubsection{Dissolved Oxygen}\label{dissolved-oxygen}}
 
-Time series analyses were conducted for the time period before the
-implementation of the Anacostia Watershed Restoration Plan (2003 to
-2009) and after its implementation (2010-2022). A seasonal
-Mann-Kendall's test was conducted on both time periods to test for
-stationarity. Both time periods display stationarity and are neither
-significantly increasing or decreasing over time with p-values greater
-that 0.05 (Table 2). The Anacostia Watershed Restoration Plan did not
-significanlty affect dissolved oxygen in the Northeast Branch.
+Time series analyses were conducted on dissolved oxygen for the time
+period before the implementation of the Anacostia Watershed Restoration
+Plan (2003 to 2009) (Figure 11) and after its implementation (2010-2022)
+(Figure 12). A seasonal Mann-Kendall's test was conducted on both time
+periods to test for stationarity. Both time periods display stationarity
+and are neither significantly increasing or decreasing over time with
+p-values greater that 0.05 (Table 2). The Anacostia Watershed
+Restoration Plan did not significanlty affect dissolved oxygen in the
+Northeast Branch.
 
 \begin{figure}
 
@@ -511,7 +458,9 @@ Time series analyses and linear models conducted on turbidity,
 temperature, specific conductivity, and dissolved oxygen on the time
 periods both before and after the implementation of the Anacostia
 Watershed Restoration Plan in 2010 were not significant. Therefore, no
-concrete
+concrete conclusions can be drawn from this analysis. However, we can
+speculate that turbidity and specific conductivity may decrease in the
+future given longer datasets.
 
 \newpage
 
